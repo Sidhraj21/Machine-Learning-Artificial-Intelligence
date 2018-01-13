@@ -1,0 +1,4 @@
+This problem has a training dataset with 19906 images of Indian actors and actresses. The dataset also has a csv file with
+class labels, classifying them in categories as YOUNG/MIDDLE/OLD. The test dataset has 6636 images, and the task is to 
+classify them as YOUNG/MIDDLE/OLD.
+
