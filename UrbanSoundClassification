@@ -1,0 +1,237 @@
+## Transforming the audio clips into numpy arrays and use sequential model from keras to predict
+import IPython.display as ipd
+from IPython import get_ipython
+get_ipython().run_line_magic('matplotlib', 'inline')
+import os
+import pandas as pd
+import librosa.display
+import numpy as np
+import glob
+import random
+from sklearn.preprocessing import LabelEncoder
+from keras.models import Sequential
+from keras.layers import Dense, Dropout, Activation, Flatten
+from keras.layers import Convolution2D, MaxPooling2D
+from keras.optimizers import Adam
+import tensorflow as tf
+from keras.utils import np_utils
+from sklearn import metrics
+from keras.callbacks import EarlyStopping
+import csv
+
+X_train = np.load('/home/sidhraj/Documents/AV/UrbanSoundClassification/training_audio.npy')
+X_test = np.load('/home/sidhraj/Documents/AV/UrbanSoundClassification/test_audio.npy')
+train = pd.read_csv('/home/sidhraj/Documents/AV/UrbanSoundClassification/train/train.csv')
+label = train['Class']
+y1 = np.array(label)
+lb = LabelEncoder()
+y = np_utils.to_categorical(lb.fit_transform(y1))         
+num_labels = y.shape[1]
+n_dim = X_train.shape[1]
+n_classes = y.shape[1]
+n_hidden_units_1 = n_dim
+n_hidden_units_2 = 400 # approx n_dim * 2
+n_hidden_units_3 = 200 # half of layer 2
+
+checkpoint_dir = "model"
+print ("Features:", n_dim, "Classes:", n_classes)
+
+tf.set_random_seed(0)
+np.random.seed(0)
+
+def create_model(activation_function='relu', init_type='normal', optimiser='Adamax', dropout_rate=0.5):
+    model = Sequential()
+    # layer 1
+    model.add(Dense(n_hidden_units_1, input_dim=n_dim, init=init_type, activation=activation_function))
+    # layer 2
+    model.add(Dense(n_hidden_units_2, init=init_type, activation=activation_function))
+    model.add(Dropout(dropout_rate))
+    # layer 3
+    model.add(Dense(n_hidden_units_3, init=init_type, activation=activation_function))
+    model.add(Dropout(dropout_rate))
+    # output layer
+    model.add(Dense(n_classes, init=init_type, activation='softmax'))
+    
+    model.compile(loss='categorical_crossentropy', optimizer=optimiser, metrics=['accuracy'])
+    return model
+
+# a stopping function to stop training before we excessively overfit to the training set
+earlystop = EarlyStopping(monitor='val_loss', patience=3, verbose=1, mode='auto')
+
+model = create_model()
+
+history = model.fit(X_train, y, validation_split=0.1, callbacks=[earlystop], nb_epoch=30, batch_size=24)
+
+predictions = model.predict(X_test)
+result = predictions.argmax(axis=-1)
+pred = list(lb.inverse_transform(result))
+type(pred)
+
+csvfile = "/home/sidhraj/Documents/AV/UrbanSoundClassification/prediction3.csv"
+with open(csvfile, "w") as output:
+    writer = csv.writer(output, lineterminator='\n')
+    for val in pred:
+        writer.writerow([val]) 
+
+print('done')
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+## Urban Sound Recognition
+## From the Audio clips extracting MFCCS, Chroma, Contrast, Tonnetz, mel features using LIBROSA Library.
+##Using sequential model from keras to train and test
+import IPython.display as ipd
+from IPython import get_ipython
+get_ipython().run_line_magic('matplotlib', 'inline')
+import os
+import pandas as pd
+import librosa.display
+import numpy as np
+import glob
+import random
+from sklearn.preprocessing import LabelEncoder
+from keras.models import Sequential
+from keras.layers import Dense, Dropout, Activation, Flatten
+from keras.layers import Convolution2D, MaxPooling2D
+from keras.optimizers import Adam
+from keras.utils import np_utils
+from sklearn import metrics
+from keras.callbacks import EarlyStopping
+import csv
+#mpl_dir = os.path.dirname(matplotlib.__file__)
+#os.system("cp {}/mpl-data/matplotlibrc ~/.matplotlib/".format(mpl_dir))
+#data, sampling_rate = librosa.load('/home/sidhraj/Documents/AV/UrbanSoundClassification/train/Train/22.wav')
+#plt.figure(figsize=(12, 4))
+#librosa.display.waveplot(data, sr=sampling_rate)
+train = pd.read_csv('/home/sidhraj/Documents/AV/UrbanSoundClassification/train/train.csv')
+print (train.shape)
+ID = train['ID']
+label = train['Class']
+
+def parser(row):
+  # function to load files and extract features
+   file_name = os.path.join(os.path.abspath('/home/sidhraj/Documents/AV/UrbanSoundClassification/train/'), 'Train', str(row.ID) + '.wav')
+   print (file_name[64:-4])
+   # handle exception to check if there isn't a file which is corrupted
+   try:
+      # here kaiser_fast is a technique used for faster extraction
+      X, sample_rate = librosa.load(file_name, res_type='kaiser_fast') 
+      # we extract mfcc feature from data
+      mfccs = np.mean(librosa.feature.mfcc(y=X, sr=sample_rate, n_mfcc=40).T,axis=0)
+      stft = np.abs(librosa.stft(X))
+      chroma = np.mean(librosa.feature.chroma_stft(S=stft, sr=sample_rate).T,axis=0)
+      mel = np.mean(librosa.feature.melspectrogram(X, sr=sample_rate).T,axis=0)
+      contrast = np.mean(librosa.feature.spectral_contrast(S=stft, sr=sample_rate).T,axis=0)
+      tonnetz = np.mean(librosa.feature.tonnetz(y=librosa.effects.harmonic(X),sr=sample_rate).T,axis=0)
+      
+   except Exception as e:
+      print("Error encountered while parsing file: ", file_name)
+      return None, None
+ 
+   #feature = mfccs
+   #print(feature.shape)
+   label = row.Class
+ 
+   return [mfccs,chroma, mel, contrast, tonnetz, label]
+
+#temp = train.apply(parser, axis=1)
+#temp.columns = ['feature1', 'feature2', 'feature3', 'feature4', 'feature5', 'label']
+#print(temp.shape)
+#X = np.array(temp.mfccs.tolist(),temp.chroma.tolist(), temp.mel.tolist(), temp.contrast.tolist(), temp.tonnetz.tolist() )
+#y = np.array(temp.label.tolist())
+#features = []
+mfccs1 = []
+chroma1 = []
+mel1 = []
+contrast1 = []
+tonnetz1 = []
+features = []
+for i in range(5435):
+    filename = str(ID[i]) +  '.wav'
+    file = ('/home/sidhraj/Documents/AV/UrbanSoundClassification/train/Train/' + filename )
+    print (filename)
+    try: 
+        data, sample_rate = librosa.load(file, res_type = 'kaiser_fast')
+        stft = np.abs(librosa.stft(data))
+        chroma = np.mean(librosa.feature.chroma_stft(S=stft, sr=sample_rate).T,axis=0)
+        mel = np.mean(librosa.feature.melspectrogram(data, sr=sample_rate).T,axis=0)
+        contrast = np.mean(librosa.feature.spectral_contrast(S=stft, sr=sample_rate).T,axis=0)
+        tonnetz = np.mean(librosa.feature.tonnetz(y=librosa.effects.harmonic(data),sr=sample_rate).T,axis=0)
+        mfccs = np.mean(librosa.feature.mfcc(y=data, sr=sample_rate, n_mfcc=40).T, axis = 0)
+    except Exception as e:
+        print("Error encountered while parsing file: ", file)
+        
+    
+    mfccs1.append(mfccs)
+    chroma1.append(chroma)
+    mel1.append(mel)
+    contrast1.append(contrast)
+    tonnetz1.append(tonnetz)
+    features.append(np.hstack([mfccs,chroma,mel,contrast,tonnetz]))
+        
+    
+X = np.array(features)
+np.save('training_audio', X)
+y = np.array(label)
+lb = LabelEncoder()
+y = np_utils.to_categorical(lb.fit_transform(y))         
+num_labels = y.shape[1]
+print(num_labels)
+filter_size = 2
+
+# build model
+model = Sequential()
+
+model.add(Dense(256, input_shape=(193,)))
+model.add(Activation('relu'))
+model.add(Dropout(0.5))
+
+model.add(Dense(256))
+model.add(Activation('relu'))
+model.add(Dropout(0.5))
+
+model.add(Dense(num_labels))
+model.add(Activation('softmax'))
+
+
+earlystop = EarlyStopping(monitor='val_loss', patience=3, verbose=1, mode='auto')
+
+model.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer='adam')
+
+model.fit(X, y, batch_size=32, epochs=30, callbacks=[earlystop], validation_split=0.1, shuffle=True)
+
+features_t = []
+test = pd.read_csv('/home/sidhraj/Documents/AV/UrbanSoundClassification/test/test.csv')
+ID1 = test['ID']
+for i in range(3297):
+    filename = str(ID1[i]) +  '.wav'
+    file = ('/home/sidhraj/Documents/AV/UrbanSoundClassification/test/Test/' + filename )
+    print (filename)
+    data, sample_rate = librosa.load(file, res_type = 'kaiser_fast')
+    stft = np.abs(librosa.stft(data))
+    chroma = np.mean(librosa.feature.chroma_stft(S=stft, sr=sample_rate).T,axis=0)
+    mel = np.mean(librosa.feature.melspectrogram(data, sr=sample_rate).T,axis=0)
+    contrast = np.mean(librosa.feature.spectral_contrast(S=stft, sr=sample_rate).T,axis=0)
+    tonnetz = np.mean(librosa.feature.tonnetz(y=librosa.effects.harmonic(data),sr=sample_rate).T,axis=0)
+    mfccs = np.mean(librosa.feature.mfcc(y=data, sr=sample_rate, n_mfcc=40).T, axis = 0)
+    features_t.append(np.hstack([mfccs,chroma,mel,contrast,tonnetz]))
+
+X_test = np.array(features_t)
+np.save('test_audio', X_test)
+print (X_test.shape)
+predictions = model.predict(X_test)
+result = predictions.argmax(axis=-1)
+pred = list(lb.inverse_transform(result))
+type(pred)
+
+csvfile = "/home/sidhraj/Documents/AV/UrbanSoundClassification/prediction.csv2"
+with open(csvfile, "w") as output:
+    writer = csv.writer(output, lineterminator='\n')
+    for val in pred:
+        writer.writerow([val]) 
+
+print('done')
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
