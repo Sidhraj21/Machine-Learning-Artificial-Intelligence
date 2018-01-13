@@ -1,3 +1,14 @@
+In this problem we have urban audio sound clips of duration 4 seconds. The training set contains 5435 sound recordings
+and there are 10 categories into which the training recordings have been classsified. (e.g. children playing, car engine,
+jack hammer, drilling, etc.). The task is to classify the recordings in the test data set which contains 3297 recordings.
+
+## First extracted only mfccs feature from sound clips(40 feature )
+## Next, used mfccs, mel, tonnetz, chroma, contrast(193 features)
+## Next ...
+
+
+
+
 ## Transforming the audio clips into numpy arrays and use sequential model from keras to predict
 import IPython.display as ipd
 from IPython import get_ipython
